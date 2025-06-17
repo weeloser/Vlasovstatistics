@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-1.0">
     <title>Статистика Власова</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
@@ -229,9 +229,6 @@
         </h1>
 
         <div class="flex flex-wrap gap-4 mb-8">
-            <button id="copy-current-statistic-btn" class="btn-primary bg-blue-500 text-white font-semibold py-2.5 px-6 rounded-xl shadow-md transition duration-200 ease-in-out transform hover:scale-105 hover:shadow-lg">
-                Копировать Статистику
-            </button>
             <button id="show-results-btn" class="btn-primary bg-purple-500 text-white font-semibold py-2.5 px-6 rounded-xl shadow-md transition duration-200 ease-in-out transform hover:scale-105 hover:shadow-lg">
                 Показать Результаты
             </button>
@@ -883,10 +880,6 @@ ENTRY: 22.566
             initializeVlasovStatistic();
             renderTradeDetail(currentStatisticId);
 
-            document.getElementById('copy-current-statistic-btn').onclick = () => {
-                const textToCopy = generateSingleStatisticExportText(currentStatisticId);
-                copyToClipboard(textToCopy);
-            };
             document.getElementById('show-results-btn').onclick = () => {
                 showResults(currentStatisticId);
             };
