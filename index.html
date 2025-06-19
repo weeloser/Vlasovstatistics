@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Статистика Власова</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
@@ -182,6 +182,11 @@
             border-radius: 0.75rem;
             padding: 0.4rem 0.8rem;
         }
+        .in-progress-text {
+            color: #9ca3af; /* Прозрачный серый */
+            font-style: italic;
+            opacity: 0.7;
+        }
 
         .btn-primary {
             transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
@@ -254,6 +259,7 @@
                         <p class="text-lg">Успешных сделок: <span id="results-successful-trades" class="font-bold color-green"></span></p>
                         <p class="text-lg">Отклоненных сделок: <span id="results-rejected-trades" class="font-bold color-red"></span></p>
                         <p class="text-lg">Несостоявшиеся сделки (б/у): <span id="results-breakeven-trades" class="font-bold color-gray"></span></p>
+                        <p class="text-lg">Сделок в отработке: <span id="results-in-progress-trades" class="font-bold color-gray"></span></p>
                     </div>
                 </div>
             </div>
@@ -267,7 +273,31 @@
 
         const VLADOV_STATISTIC_NAME = "Илья Власов - Грабитель ММ";
 
-        const ALL_USER_PROVIDED_TRADES_TEXT = `ZKJ (Лонг)
+        const ALL_USER_PROVIDED_TRADES_TEXT = `INJ (long)
+Чистое движение: 0.21%
+ENTRY: 11.345
+Маржа: X1
+Фиксации: 11.425 (30%) 11.345 (70%)
+18.06.25
+📅
+
+LINK (short)
+Чистое движение: 1.18%
+ENTRY: 12.925
+Маржа: X1
+Фиксации: 12.772 (100%)
+18.06.25
+📅
+
+AVAX (short)
+Чистое движение: 0.00%
+ENTRY: 268.25
+Маржа: X1
+Фиксации: 268.25 (100%)
+17.06.25
+📅
+
+ZKJ (Лонг)
 Чистое движение: -2.24%
 ENTRY: 0.4394
 Маржа: X0.25
@@ -581,7 +611,7 @@ ENTRY: 22.566
                 let trade = { fixations: [] };
                 const firstLine = lines[0];
 
-                const coinDirectionMatch = firstLine.match(/^(.+?)\s*\((Лонг|Шорт)\)$/i);
+                const coinDirectionMatch = firstLine.match(/^(.+?)\s*\((Лонг|Шорт|short|long)\)$/i);
 
                 if (coinDirectionMatch) {
                     let coinNameFull = coinDirectionMatch[1].trim();
@@ -592,16 +622,20 @@ ENTRY: 22.566
                         coinNameFull = coinNameFull.replace(/\(скальп\)/i, '').trim();
                     }
 
-                    trade.coin = coinNameFull.toUpperCase();
-                    trade.direction = (direction === 'лонг' ? 'long' : 'short');
+                    trade.coin = coinNameFull.toUpperCase(); // Убеждаемся, что название монеты всегда в верхнем регистре
+                    trade.direction = (direction === 'лонг' || direction === 'long' ? 'long' : 'short');
                 } else {
                     console.warn("Could not parse coin and direction from line:", firstLine);
                     return;
                 }
 
+                let hasNetMovement = false;
+                let hasFixations = false;
+
                 lines.slice(1).forEach(line => {
                     if (line.startsWith('Чистое движение:')) {
                         trade.netMovement = parseFloat(line.replace('Чистое движение:', '').replace('%', '').trim());
+                        hasNetMovement = true;
                     } else if (line.startsWith('ENTRY:')) {
                         trade.entry = parseFloat(line.replace('ENTRY:', '').trim());
                     } else if (line.startsWith('Маржа:')) {
@@ -619,7 +653,8 @@ ENTRY: 22.566
                         if (trade.fixations.length === 0 && fixationsString.includes('100%') && !isNaN(trade.entry)) {
                              trade.fixations.push({ price: trade.entry, percent: 100 });
                         }
-                    } else if (line.startsWith('Дата:')) {
+                        hasFixations = true;
+                    } else if (line.startsWith('Дата:')) { // Обработка даты с префиксом "Дата:"
                         const dateString = line.replace('Дата:', '').trim();
                         if (dateString) {
                             const parts = dateString.split('.');
@@ -630,12 +665,34 @@ ENTRY: 22.566
                                 trade.date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day)).toISOString();
                             }
                         }
+                    } else if (line.match(/^(\d{2})\.(\d{2})\.(\d{2})$/)) { // Обработка даты без префикса (DD.MM.YY)
+                        const dateMatch = line.match(/^(\d{2})\.(\d{2})\.(\d{2})$/);
+                        if (dateMatch) {
+                            const day = dateMatch[1];
+                            const month = dateMatch[2];
+                            const year = `20${dateMatch[3]}`;
+                            trade.date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day)).toISOString();
+                        }
+                    }
+                    // Игнорируем строки, содержащие только эмодзи календаря
+                    if (line === '📅') {
+                        // Просто пропускаем
                     }
                 });
+
                 trade.id = `trade-${crypto.randomUUID()}`;
-                const metrics = calculateTradeMetrics(trade);
-                trade.netMovement = metrics.netMovement;
-                trade.isProfitable = metrics.isProfitable;
+                
+                // Если нет чистого движения ИЛИ фиксаций, помечаем как "в отработке"
+                if (!hasNetMovement || !hasFixations) {
+                    trade.isInProgress = true;
+                    trade.netMovement = 0; // Устанавливаем 0, чтобы не влияло на общие результаты
+                    trade.isProfitable = false; // Не считается прибыльной/убыточной для винрейта
+                } else {
+                    trade.isInProgress = false;
+                    const metrics = calculateTradeMetrics(trade);
+                    trade.netMovement = metrics.netMovement;
+                    trade.isProfitable = metrics.isProfitable;
+                }
 
                 trades.push(trade);
             });
@@ -683,6 +740,7 @@ ENTRY: 22.566
                     profitableTrades: 0,
                     rejectedTrades: 0,
                     breakevenTrades: 0,
+                    inProgressTrades: 0, // Новое поле
                     winRate: 0,
                     totalNetMovement: 0
                 };
@@ -691,30 +749,37 @@ ENTRY: 22.566
             let profitableTrades = 0;
             let rejectedTrades = 0;
             let breakevenTrades = 0;
+            let inProgressTrades = 0; // Новый счетчик
             let totalNetMovement = 0;
 
             stat.trades.forEach(trade => {
-                const metrics = calculateTradeMetrics(trade);
-                trade.netMovement = metrics.netMovement;
-                trade.isProfitable = metrics.isProfitable;
+                if (trade.isInProgress) {
+                    inProgressTrades++;
+                } else { // Учитываем только завершенные сделки для этих категорий
+                    const metrics = calculateTradeMetrics(trade);
+                    trade.netMovement = metrics.netMovement;
+                    trade.isProfitable = metrics.isProfitable;
 
-                if (trade.netMovement > 0) {
-                    profitableTrades++;
-                } else if (trade.netMovement < 0) {
-                    rejectedTrades++;
-                } else {
-                    breakevenTrades++;
+                    if (trade.netMovement > 0) {
+                        profitableTrades++;
+                    } else if (trade.netMovement < 0) {
+                        rejectedTrades++;
+                    } else { // Net movement is 0
+                        breakevenTrades++;
+                    }
+                    totalNetMovement += trade.netMovement;
                 }
-                totalNetMovement += trade.netMovement;
             });
 
-            const winRate = (profitableTrades / stat.trades.length) * 100;
+            const completedTradesCount = profitableTrades + rejectedTrades + breakevenTrades;
+            const winRate = (completedTradesCount > 0) ? (profitableTrades / completedTradesCount) * 100 : 0;
 
             return {
-                totalTrades: stat.trades.length,
+                totalTrades: stat.trades.length, // Общее количество всех сделок (включая в отработке)
                 profitableTrades: profitableTrades,
                 rejectedTrades: rejectedTrades,
                 breakevenTrades: breakevenTrades,
+                inProgressTrades: inProgressTrades, // Количество сделок в отработке
                 winRate: winRate,
                 totalNetMovement: totalNetMovement
             };
@@ -735,29 +800,32 @@ ENTRY: 22.566
                 tradeListContainer.classList.remove('hidden');
             }
 
-            stat.trades.forEach(trade => {
-                const metrics = calculateTradeMetrics(trade);
-                trade.netMovement = metrics.netMovement;
-                trade.isProfitable = metrics.isProfitable;
-            });
-
-            const tradesToRender = [...stat.trades];
-
-            tradesToRender.forEach((trade, index) => {
+            stat.trades.forEach((trade, index) => {
                 let profitLossClass = '';
-                if (trade.netMovement > 0) {
-                    profitLossClass = 'profit-loss-green';
-                } else if (trade.netMovement < 0) {
-                    profitLossClass = 'profit-loss-red';
-                } else {
-                    profitLossClass = 'profit-loss-gray';
-                }
+                let netMovementDisplay = '';
+                let fixationsDisplay = '';
+                let tradeCardClasses = "trade-card bg-white p-6 rounded-xl shadow-md cursor-default";
 
-                const fixationsString = trade.fixations.map(fix => {
-                    const price = parseFloat(fix.price);
-                    const percent = parseFloat(fix.percent);
-                    return `${isNaN(price) ? 'N/A' : price} (${isNaN(percent) ? 'N/A' : percent}%)`;
-                }).join(' ');
+                if (trade.isInProgress) {
+                    netMovementDisplay = '<span class="in-progress-text">В отработке</span>';
+                    fixationsDisplay = '<span class="in-progress-text">В отработке</span>';
+                    profitLossClass = 'profit-loss-gray'; // Используем обычный серый фон для "в отработке"
+                    tradeCardClasses += " opacity-70"; // Делаем карточку слегка прозрачной
+                } else {
+                    if (trade.netMovement > 0) {
+                        profitLossClass = 'profit-loss-green';
+                    } else if (trade.netMovement < 0) {
+                        profitLossClass = 'profit-loss-red';
+                    } else {
+                        profitLossClass = 'profit-loss-gray';
+                    }
+                    netMovementDisplay = `Чистое движение: ${isNaN(trade.netMovement) ? 'N/A' : trade.netMovement.toFixed(2)}%`;
+                    fixationsDisplay = trade.fixations.map(fix => {
+                        const price = parseFloat(fix.price);
+                        const percent = parseFloat(fix.percent);
+                        return `${isNaN(price) ? 'N/A' : price} (${isNaN(percent) ? 'N/A' : percent}%)`;
+                    }).join(' ');
+                }
 
                 let displayDate = 'Дата не добавлена';
                 if (trade.date) {
@@ -770,16 +838,16 @@ ENTRY: 22.566
                 const directionText = trade.direction === 'long' ? '<span class="color-green">long</span>' : '<span class="color-red">short</span>';
 
                 const tradeCardHtml = `
-                    <div class="trade-card bg-white p-6 rounded-xl shadow-md cursor-default" data-trade-id="${trade.id}" data-vlasov-readonly="true" style="animation-delay: ${index * 0.05}s;">
+                    <div class="${tradeCardClasses}" data-trade-id="${trade.id}" data-vlasov-readonly="true" style="animation-delay: ${index * 0.05}s;">
                         <div class="flex justify-between items-center mb-2">
                             <h4 class="text-lg font-semibold text-gray-800">${trade.coin} (${directionText})</h4>
                             <span class="px-3 py-1 rounded-full text-sm font-bold ${profitLossClass}">
-                                Чистое движение: ${isNaN(trade.netMovement) ? 'N/A' : trade.netMovement.toFixed(2)}%
+                                ${netMovementDisplay}
                             </span>
                         </div>
                         <p class="text-sm text-gray-600 mb-2">ENTRY: ${isNaN(trade.entry) ? 'N/A' : trade.entry}</p>
                         <p class="text-sm text-gray-600 mb-2">Маржа: X${isNaN(trade.margin) ? 'N/A' : trade.margin}</p>
-                        <p class="text-sm text-gray-600 mb-2">Фиксации: ${fixationsString}</p>
+                        <p class="text-sm text-gray-600 mb-2">Фиксации: ${fixationsDisplay}</p>
                         <div class="trade-date-display-wrapper">
                             <div class="date-wrapper disabled-date-interaction">
                                 <span class="trade-date-display-text">${displayDate}</span>
@@ -816,6 +884,7 @@ ENTRY: 22.566
             document.getElementById('results-successful-trades').textContent = metrics.profitableTrades;
             document.getElementById('results-rejected-trades').textContent = metrics.rejectedTrades;
             document.getElementById('results-breakeven-trades').textContent = metrics.breakevenTrades;
+            document.getElementById('results-in-progress-trades').textContent = metrics.inProgressTrades; // Обновление нового поля
 
             openModal('results-modal');
         }
@@ -842,13 +911,21 @@ ENTRY: 22.566
                         tradeDateString = tradeDate.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: '2-digit' });
                     }
                 }
-
-                exportContent += `${trade.coin} (${directionText})\n`;
-                exportContent += `Чистое движение: ${isNaN(trade.netMovement) ? 'N/A' : trade.netMovement.toFixed(2)}%\n`;
-                exportContent += `ENTRY: ${isNaN(trade.entry) ? 'N/A' : trade.entry}\n`;
-                exportContent += `Маржа: X${isNaN(trade.margin) ? 'N/A' : trade.margin}\n`;
-                exportContent += `Фиксации: ${fixationsString}\n`;
-                exportContent += `Дата: ${tradeDateString}\n\n`;
+                
+                // If in progress, do not export netMovement and fixations as actual values
+                if (trade.isInProgress) {
+                    exportContent += `${trade.coin} (${directionText})\n`;
+                    exportContent += `ENTRY: ${isNaN(trade.entry) ? 'N/A' : trade.entry}\n`;
+                    exportContent += `Маржа: X${isNaN(trade.margin) ? 'N/A' : trade.margin}\n`;
+                    exportContent += `Дата: ${tradeDateString}\n\n`;
+                } else {
+                    exportContent += `${trade.coin} (${directionText})\n`;
+                    exportContent += `Чистое движение: ${isNaN(trade.netMovement) ? 'N/A' : trade.netMovement.toFixed(2)}%\n`;
+                    exportContent += `ENTRY: ${isNaN(trade.entry) ? 'N/A' : trade.entry}\n`;
+                    exportContent += `Маржа: X${isNaN(trade.margin) ? 'N/A' : trade.margin}\n`;
+                    exportContent += `Фиксации: ${fixationsString}\n`;
+                    exportContent += `Дата: ${tradeDateString}\n\n`;
+                }
             });
             return exportContent.trim();
         }
