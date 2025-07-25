@@ -3,977 +3,1232 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Статистика Власова</title>
+    <title>Торговая Статистика - Грабитель ММ</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.plot.ly/plotly-2.32.0.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes fadeInUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes pulse-green { 0%, 100% { text-shadow: 0 0 5px #10b981, 0 0 10px #10b981; } 50% { text-shadow: 0 0 10px #34d399, 0 0 20px #34d399; } }
+        @keyframes pulse-cyan { 0%, 100% { text-shadow: 0 0 5px #22d3ee, 0 0 10px #22d3ee; } 50% { text-shadow: 0 0 10px #67e8f9, 0 0 20px #67e8f9; } }
+
         body {
             font-family: 'Inter', sans-serif;
-            background: linear-gradient(135deg, #f0f2f5 0%, #e2e8f0 100%);
-            display: flex;
-            justify-content: center;
-            align-items: flex-start;
-            min-height: 100vh;
-            padding: 20px;
-            box-sizing: border-box;
-            overflow-y: auto;
-            scroll-behavior: smooth;
+            background-color: #020617;
+            color: #e2e8f0;
+            overflow-x: hidden;
         }
-        body::-webkit-scrollbar {
-            width: 8px;
-        }
-        body::-webkit-scrollbar-track {
-            background: #f0f2f5;
-            border-radius: 10px;
-        }
-        body::-webkit-scrollbar-thumb {
-            background: #a78bfa;
-            border-radius: 10px;
-            border: 2px solid #f0f2f5;
-        }
-        body::-webkit-scrollbar-thumb:hover {
-            background: #8b5cf6;
-        }
-
-        .container {
-            background-color: #ffffff;
-            border-radius: 2rem;
-            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.25);
-            padding: 3rem;
-            width: 100%;
-            max-width: 960px;
-            margin-top: 30px;
-            position: relative;
-            animation: fadeInScale 0.8s cubic-bezier(0.2, 0.8, 0.2, 1);
-        }
-        @keyframes fadeInScale {
-            from { opacity: 0; transform: translateY(30px) scale(0.98); }
-            to { opacity: 1; transform: translateY(0) scale(1); }
-        }
-
-        .modal-overlay {
+        #background-canvas {
             position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.8);
-            backdrop-filter: blur(8px);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            z-index: 1000;
-            opacity: 0;
-            visibility: hidden;
-            transition: opacity 0.4s ease, visibility 0.4s ease;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            z-index: -1;
         }
-        .modal-overlay.active {
-            opacity: 1;
-            visibility: visible;
+        .card {
+            background: linear-gradient(135deg, rgba(30, 41, 59, 0.4), rgba(15, 23, 42, 0.4));
+            border: 1px solid rgba(51, 65, 85, 0.5);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            transition: all 0.2s ease-out;
+            position: relative;
+            overflow: hidden;
+            animation: fadeInUp 0.5s ease-out forwards;
+            transform-style: preserve-3d;
+            box-shadow: 0 0 0 1px rgba(51, 65, 85, 0.7), 0 8px 32px 0 rgba(0, 0, 0, 0.37);
         }
+        .card:hover {
+            border-color: rgba(34, 211, 238, 0.4);
+            box-shadow: 0 0 0 1px rgba(34, 211, 238, 0.5), 0 10px 40px rgba(0,0,0,0.4);
+        }
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #1e293b; }
+        ::-webkit-scrollbar-thumb { background: #475569; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: #64748b; }
+        input[type=number]::-webkit-inner-spin-button, 
+        input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+        input[type=number] { -moz-appearance: textfield; }
+        .modal-backdrop {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px);
+            z-index: 40; opacity: 0; transition: opacity 0.3s ease; pointer-events: none;
+        }
+        .modal-backdrop.active { opacity: 1; pointer-events: all; }
         .modal-content {
-            background-color: #ffffff;
-            border-radius: 2rem;
-            padding: 3rem;
-            max-width: 90%;
-            max-height: 90%;
-            overflow-y: auto;
-            transform: translateY(-50px) scale(0.8) rotateX(-10deg);
-            opacity: 0;
-            transition: transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.5s ease;
-            position: relative;
-            box-shadow: 0 30px 70px rgba(0, 0, 0, 0.4);
+            position: fixed; top: 50%; left: 50%;
+            transform: translate(-50%, -50%) scale(0.95);
+            z-index: 50; opacity: 0; transition: all 0.3s ease; pointer-events: none;
         }
-        .modal-overlay.active .modal-content {
-            transform: translateY(0) scale(1) rotateX(0deg);
-            opacity: 1;
-        }
-        .close-button {
-            position: absolute;
-            top: 1.5rem;
-            right: 1.5rem;
-            background: none;
-            border: none;
-            font-size: 2.2rem;
-            cursor: pointer;
-            color: #9ca3af;
-            transition: transform 0.3s ease, color 0.3s ease, text-shadow 0.3s ease;
-        }
-        .close-button:hover {
-            transform: rotate(180deg) scale(1.1);
-            color: #ef4444;
-            text-shadow: 0 0 8px rgba(239, 68, 68, 0.5);
-        }
-
-        .trade-card {
-            transition: background-color 0.3s ease, box-shadow 0.3s ease, transform 0.3s ease;
-            position: relative;
-            overflow: hidden;
-            border-radius: 1rem;
-            animation: slideInUp 0.6s cubic-bezier(0.23, 1, 0.32, 1) forwards;
-            opacity: 0;
-            transform: translateY(20px);
-        }
-        .trade-card:nth-child(1) { animation-delay: 0s; }
-        .trade-card:nth-child(2) { animation-delay: 0.05s; }
-        .trade-card:nth-child(3) { animation-delay: 0.1s; }
-        .trade-card:nth-child(4) { animation-delay: 0.15s; }
-        .trade-card:nth-child(5) { animation-delay: 0.2s; }
-        .trade-card:nth-child(6) { animation-delay: 0.25s; }
-        .trade-card:nth-child(7) { animation-delay: 0.3s; }
-        .trade-card:nth-child(8) { animation-delay: 0.35s; }
-        .trade-card:nth-child(9) { animation-delay: 0.4s; }
-        .trade-card:nth-child(10) { animation-delay: 0.45s; }
-        .trade-card:nth-child(11) { animation-delay: 0.5s; }
-        .trade-card:nth-child(12) { animation-delay: 0.55s; }
-        .trade-card:nth-child(13) { animation-delay: 0.6s; }
-        .trade-card:nth-child(14) { animation-delay: 0.65s; }
-        .trade-card:nth-child(15) { animation-delay: 0.7s; }
-        .trade-card:nth-child(16) { animation-delay: 0.75s; }
-        .trade-card:nth-child(17) { animation-delay: 0.8s; }
-        .trade-card:nth-child(18) { animation-delay: 0.85s; }
-        .trade-card:nth-child(19) { animation-delay: 0.9s; }
-        .trade-card:nth-child(20) { animation-delay: 0.95s; }
-        .trade-card:nth-child(21) { animation-delay: 1s; }
-        .trade-card:nth-child(22) { animation-delay: 1.05s; }
-        .trade-card:nth-child(23) { animation-delay: 1.1s; }
-        .trade-card:nth-child(24) { animation-delay: 1.15s; }
-        .trade-card:nth-child(25) { animation-delay: 1.2s; }
-        .trade-card:nth-child(26) { animation-delay: 1.25s; }
-        .trade-card:nth-child(27) { animation-delay: 1.3s; }
-        .trade-card:nth-child(28) { animation-delay: 1.35s; }
-        .trade-card:nth-child(29) { animation-delay: 1.4s; }
-        .trade-card:nth-child(30) { animation-delay: 1.45s; }
-        .trade-card:nth-child(31) { animation-delay: 1.5s; }
-        .trade-card:nth-child(32) { animation-delay: 1.55s; }
-        .trade-card:nth-child(33) { animation-delay: 1.6s; }
-        .trade-card:nth-child(34) { animation-delay: 1.65s; }
-        .trade-card:nth-child(35) { animation-delay: 1.7s; }
-        .trade-card:nth-child(36) { animation-delay: 1.75s; }
-        .trade-card:nth-child(37) { animation-delay: 1.8s; }
-        .trade-card:nth-child(38) { animation-delay: 1.85s; }
-        .trade-card:nth-child(39) { animation-delay: 1.9s; }
-        .trade-card:nth-child(40) { animation-delay: 1.95s; }
-        .trade-card:nth-child(41) { animation-delay: 2s; }
-
-        @keyframes slideInUp {
-            from { opacity: 0; transform: translateY(20px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        .color-green { color: #059669; }
-        .color-red { color: #dc2626; }
-        .color-gray { color: #4b5563; }
-        .profit-loss-green {
-            background-color: #dcfce7;
-            color: #047857;
-            border-radius: 0.75rem;
-            padding: 0.4rem 0.8rem;
-        }
-        .profit-loss-red {
-            background-color: #fee4e5;
-            color: #b91c1c;
-            border-radius: 0.75rem;
-            padding: 0.4rem 0.8rem;
-        }
-        .profit-loss-gray {
-            background-color: #e5e7eb;
-            color: #374151;
-            border-radius: 0.75rem;
-            padding: 0.4rem 0.8rem;
-        }
-        .in-progress-text {
-            color: #9ca3af; /* Прозрачный серый */
-            font-style: italic;
-            opacity: 0.7;
-        }
-
-        .btn-primary {
-            transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
-            background-size: 250% auto;
-            font-weight: 600;
-            letter-spacing: 0.025em;
-            border: none;
-            position: relative;
-            overflow: hidden;
-        }
-        .btn-primary:hover {
-            background-position: right center;
-            box-shadow: 0 10px 30px rgba(99, 102, 241, 0.5);
-            transform: translateY(-4px);
-        }
-        .btn-primary:active {
-            transform: translateY(0) scale(0.95);
-            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
-            background-position: left center;
-            filter: brightness(0.9);
-        }
-
-        #detail-statistic-name {
-            color: #1f2937;
-            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
-        }
-
-        @media (max-width: 768px) {
-            .container {
-                padding: 2rem;
-                margin-top: 15px;
-            }
-            .modal-content {
-                padding: 2rem;
-            }
-        }
+        .modal-content.active { transform: translate(-50%, -50%) scale(1); opacity: 1; pointer-events: all; }
+        .title-glow { text-shadow: 0 0 10px rgba(16, 185, 129, 0.5), 0 0 25px rgba(14, 165, 233, 0.3); }
+        .metric-pnl { animation: pulse-green 4s infinite ease-in-out; }
+        .metric-winrate { animation: pulse-cyan 4s infinite ease-in-out; }
     </style>
-    <link rel="icon" href="https://iimg.su/s/15/g6I4o0VkLLmz7zNae7XGOXhUS0s84fTjUgLQuXCF.jpg" type="image/jpeg">
 </head>
-<body class="bg-gray-100">
-    <div id="app" class="container">
-        <h1 class="text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-indigo-600 mb-10 mt-4">
-            Статистика Власова
-        </h1>
-
-        <div class="flex flex-wrap gap-4 mb-8">
-            <button id="show-results-btn" class="btn-primary bg-purple-500 text-white font-semibold py-2.5 px-6 rounded-xl shadow-md transition duration-200 ease-in-out transform hover:scale-105 hover:shadow-lg">
-                Показать Результаты
-            </button>
-        </div>
-        <div id="trade-list" class="space-y-6">
-        </div>
-        <div id="no-trades-message" class="text-center text-gray-500 text-xl mt-16 hidden animate-fadeIn">
-            <p>Пока нет сделок в этой статистике.</p>
-        </div>
-
-        <div id="results-modal" class="modal-overlay">
-            <div class="modal-content">
-                <button id="close-results-modal-btn" class="close-button">&times;</button>
-                <h2 class="text-3xl font-bold mb-8 text-gray-800 text-center">Результаты Статистики</h2>
-                <div id="results-content" class="space-y-4 text-center">
-                    <p class="text-xl">Чистое движение: <span id="results-net-movement" class="font-bold"></span></p>
-                    <p class="text-xl">Количество сделок: <span id="results-total-trades" class="font-bold"></span></p>
-                    <p class="text-xl">Винрейт: <span id="results-winrate" class="font-bold"></span></p>
-                    <button id="results-details-btn" class="btn-primary mt-6 bg-blue-500 text-white font-semibold py-2.5 px-6 rounded-xl shadow-md">
-                        Подробнее...
-                    </button>
-                    <div id="results-additional-info" class="hidden mt-4 space-y-3">
-                        <p class="text-lg">Успешных сделок: <span id="results-successful-trades" class="font-bold color-green"></span></p>
-                        <p class="text-lg">Отклоненных сделок: <span id="results-rejected-trades" class="font-bold color-red"></span></p>
-                        <p class="text-lg">Несостоявшиеся сделки (б/у): <span id="results-breakeven-trades" class="font-bold color-gray"></span></p>
-                        <p class="text-lg">Сделок в отработке: <span id="results-in-progress-trades" class="font-bold color-gray"></span></p>
-                    </div>
+<body class="antialiased min-h-screen">
+    <canvas id="background-canvas"></canvas>
+    <div class="container mx-auto p-4 sm:p-6 lg:p-8 relative z-10">
+        <header class="text-center mb-12" style="animation: fadeIn 1s ease-out;">
+            <h1 class="text-4xl md:text-5xl font-extrabold text-white tracking-tight title-glow">
+                <span class="bg-clip-text text-transparent bg-gradient-to-r from-green-400 to-cyan-400">Статистика: Грабитель ММ</span>
+            </h1>
+            <p id="last-update" class="text-slate-400 mt-3 text-sm"></p>
+        </header>
+        <div class="grid grid-cols-1 lg:grid-cols-5 gap-6">
+            <div class="lg:col-span-2 flex flex-col gap-6" style="perspective: 1000px;">
+                <div class="card rounded-2xl p-6 grid grid-cols-2 gap-6">
+                    <div class="col-span-2 text-lg font-bold text-slate-200">Ключевые метрики</div>
+                    <div><span class="text-sm text-slate-400">Чистое движение</span><p id="summary-total_pnl" class="text-2xl font-bold text-green-400 metric-pnl"></p></div>
+                    <div><span class="text-sm text-slate-400">Винрейт</span><p id="summary-winrate" class="text-2xl font-bold text-cyan-400 metric-winrate"></p></div>
+                    <div><span class="text-sm text-slate-400">Всего сделок</span><p id="summary-total_deals" class="text-2xl font-bold text-slate-200"></p></div>
+                    <div class="h-24"><div id="summary-chart" class="w-full h-full"></div></div>
+                </div>
+                <div class="card rounded-2xl p-6">
+                    <h2 class="text-lg font-bold mb-4 text-slate-200">Кастомная симуляция</h2>
+                    <form id="custom-sim-form" class="space-y-4">
+                        <div>
+                            <label for="balance" class="text-sm font-medium text-slate-400">Начальный баланс ($)</label>
+                            <input type="number" id="balance" value="1000" class="mt-1 block w-full bg-slate-800/50 border-slate-700 rounded-lg shadow-sm py-2 px-3 focus:ring-green-500 focus:border-green-500">
+                        </div>
+                        <div>
+                            <label for="risk" class="text-sm font-medium text-slate-400">Риск на сделку (%)</label>
+                            <input type="number" id="risk" value="3" class="mt-1 block w-full bg-slate-800/50 border-slate-700 rounded-lg shadow-sm py-2 px-3 focus:ring-green-500 focus:border-green-500">
+                        </div>
+                        <div>
+                            <label for="leverage" class="text-sm font-medium text-slate-400">Кредитное плечо (x)</label>
+                            <input type="number" id="leverage" value="35" class="mt-1 block w-full bg-slate-800/50 border-slate-700 rounded-lg shadow-sm py-2 px-3 focus:ring-green-500 focus:border-green-500">
+                        </div>
+                        <div class="flex space-x-4 pt-2">
+                            <button type="submit" data-sim-type="compound" class="w-full bg-green-600 hover:bg-green-500 text-white font-bold py-2.5 px-4 rounded-lg transition-all duration-300 transform hover:scale-105 shadow-lg shadow-green-600/20">Сложный %</button>
+                            <button type="submit" data-sim-type="simple" class="w-full bg-slate-600 hover:bg-slate-500 text-white font-bold py-2.5 px-4 rounded-lg transition-all duration-300 transform hover:scale-105">Простой %</button>
+                        </div>
+                    </form>
+                </div>
+                <div id="simulation-section" class="card rounded-2xl p-6 hidden">
+                     <h2 class="text-lg font-bold mb-4 text-slate-200">Результаты симуляции</h2>
+                     <div id="simulation-results" class="text-slate-400 mb-4"></div>
+                     <div id="simulation-chart" class="w-full h-48"></div>
+                </div>
+            </div>
+            <div class="lg:col-span-3 flex flex-col gap-6" style="perspective: 1000px;">
+                <div class="card rounded-2xl p-4 sm:p-6">
+                    <h2 class="text-lg font-bold mb-4 text-center text-slate-200">Динамика общего PnL (%)</h2>
+                    <div id="pnl-chart" class="w-full h-80"></div>
+                </div>
+                <div class="card rounded-2xl p-4 sm:p-6 flex-grow">
+                     <h2 class="text-lg font-bold mb-4 text-slate-200">История сделок</h2>
+                     <div id="trades-list-container" class="overflow-auto max-h-[28rem]"></div>
                 </div>
             </div>
         </div>
-
+        <footer class="text-center mt-12 text-slate-500 text-sm" style="animation: fadeIn 1s 0.5s ease-out backwards;">
+            <p>Нашли ошибку? Свяжитесь с <a href="https://t.me/weeloser" target="_blank" class="text-cyan-400 hover:underline">@weeloser</a></p>
+        </footer>
     </div>
+    <div id="modal-backdrop" class="modal-backdrop"></div>
+    <div id="upload-modal" class="modal-content w-full max-w-sm"><div class="card rounded-2xl p-8 text-center"><h3 class="text-xl font-bold mb-4">Обновление данных</h3><p class="text-slate-400 mb-6">Загрузите новый файл <code>stats.txt</code>.</p><input type="file" id="file-input" class="hidden" accept=".txt"><button onclick="document.getElementById('file-input').click()" class="w-full bg-green-600 hover:bg-green-500 text-white font-bold py-2.5 px-4 rounded-lg transition-all">Выбрать файл</button></div></div>
+    <div id="code-modal" class="modal-content w-full max-w-4xl"><div class="card rounded-2xl p-6"><h3 class="text-xl font-bold mb-4">Код обновленной страницы</h3><p class="text-slate-400 mb-4 text-sm">Скопируйте этот код и сохраните его как новый <code>index.html</code> файл.</p><textarea id="code-output" readonly class="w-full h-96 bg-slate-900 border border-slate-700 rounded-lg p-4 font-mono text-xs text-slate-300 resize-none"></textarea><div class="flex gap-4 mt-4"><button id="copy-code-btn" class="flex-grow bg-cyan-600 hover:bg-cyan-500 text-white font-bold py-2.5 px-4 rounded-lg transition-all">Скопировать код</button><button onclick="closeAllModals()" class="bg-slate-600 hover:bg-slate-500 text-white font-bold py-2.5 px-4 rounded-lg transition-all">Закрыть</button></div></div></div>
+    <script id="stats-data-template" type="text/plain">
+--- Статистика: Илья Власов - Грабитель ММ ---
+Чистое движение: 93.45%
+Винрейт: 62.67%
+Всего сделок: 96
+Успешных: 47
+Убыточных: 28
+В безубыток: 22
+В отработке: 0
 
-    <script>
-        let statistics = {};
-        let currentStatisticId = null;
 
-        const VLADOV_STATISTIC_NAME = "Илья Власов - Грабитель ММ";
+Начало - 17.05.25
+Последнее обновление - 24.07.25
+Если нашли ошибку/опечатку = t.me/weeloser
 
-        const ALL_USER_PROVIDED_TRADES_TEXT = `INJ (long)
+
+
+--- Статистика: Илья Власов - Грабитель ММ ---
+
+TIA (long)
+Чистое движение: -4.12%
+ENTRY: 1.8943
+Маржа: X1
+Фиксации: 1.8163
+Дата: 24.07.2025
+
+INJ (long)
+Чистое движение: 0.00%
+ENTRY: 13.752
+Маржа: X1
+Фиксации: 13.752 (100%)
+Дата: 24.07.2025
+
+FLOKI (long)
+Чистое движение: 0.00%
+ENTRY: 0.00012881
+Маржа: X1
+Фиксации: 0.00012881 (100%)
+Дата: 24.07.2025
+
+RUNE (long)
+Чистое движение: 0.00%
+ENTRY: 1.457
+Маржа: X0.75
+Фиксации: 1.457
+Дата: 24.07.2025
+
+FLOKI (long)
+Чистое движение: 1.10%
+ENTRY: 0.00012839
+Маржа: X1
+Фиксации: 0.00013309 (30%) 0.00012839 (70%)
+Дата: 24.07.2025
+
+ONDO (long)
+Чистое движение: 6.14%
+ENTRY: 0.98
+Маржа: X1
+Фиксации: 1.0402 (100%)
+Дата: 24.07.2025
+
+NEAR (short)
+Чистое движение: 2.69%
+ENTRY: 2.7021
+Маржа: X1
+Фиксации: 2.605 (30%) 2.64 (70%)
+Дата: 24.07.2025
+
+PENGU (short)
+Чистое движение: 2.63%
+ENTRY: 0.040279
+Маржа: X1
+Фиксации: 0.038633 (30%) 0.03947 (70%)
+Дата: 24.07.2025
+
+ENS (short)
+Чистое движение: 1.15%
+ENTRY: 27.994
+Маржа: X1
+Фиксации: 26.925 (30%) 27.994 (70%)
+Дата: 23.07.2025
+
+UNI (short)
+Чистое движение: 0.33%
+ENTRY: 9.949
+Маржа: X1
+Фиксации: 9.916 (100%)
+Дата: 23.07.2025
+
+ENS (short)
+Чистое движение: 1.15%
+ENTRY: 27.994
+Маржа: X1
+Фиксации: 26.925 (30%)
+Дата: 23.07.2025
+
+LDO (short)
+Чистое движение: -4.11%
+ENTRY: 1.1553
+Маржа: X1
+Фиксации: 1.2028 (100%)
+Дата: 22.07.2025
+
+OP (long)
+Чистое движение: 0.00%
+ENTRY: 0.8025
+Маржа: X1
+Фиксации: 0.8025 (100%)
+Дата: 21.07.2025
+
+ONDO (long)
+Чистое движение: 0.00%
+ENTRY: 1.0676
+Маржа: X1
+Фиксации: 1.0676 (100%)
+Дата: 18.07.2025
+
+ONDO (long)
+Чистое движение: -3.09%
+ENTRY: 1.0283
+Маржа: X1
+Фиксации: 0.9965 (100%)
+Дата: 17.07.2025
+
+FARTCOIN (long)
+Чистое движение: 5.44%
+ENTRY: 1.2524
+Маржа: X0.5
+Фиксации: 1.3669 (30%) 1.3979 (70%)
+Дата: 16.07.2025
+
+HYPE (short)
+Чистое движение: 0.87%
+ENTRY: 47.582
+Маржа: X0.5
+Фиксации: 43.42 (20%)
+Дата: 15.07.2025
+
+UNI (long)
+Чистое движение: -3.16%
+ENTRY: 9.45
+Маржа: X1
+Фиксации: 9.151 (100%)
+Дата: 14.07.2025
+
+AUCTION (short)
+Чистое движение: 0.00%
+ENTRY: 11.828
+Маржа: X0.5
+Фиксации: 11.828 (100%)
+Дата: 13.07.2025
+
+PENGU (long)
+Чистое движение: 7.44%
+ENTRY: 0.022496
+Маржа: X1
+Фиксации: 0.023167 (30%) 0.024601 (70%)
+Дата: 12.07.2025
+
+BLUR (short)
+Чистое движение: -2.26%
+ENTRY: 0.08455
+Маржа: X0.75
+Фиксации: 0.0871 (100%)
+Дата: 12.07.2025
+
+OP (long)
+Чистое движение: 4.57%
+ENTRY: 0.5945
+Маржа: X1
+Фиксации: 0.6093 (30%) 0.627 (70%)
+Дата: 10.07.2025
+
+AAVE (long)
+Чистое движение: 3.20%
+ENTRY: 300.55
+Маржа: X0.75
+Фиксации: 313.38 (100%)
+Дата: 10.07.2025
+
+PEPE (long)
+Чистое движение: 6.10%
+ENTRY: 0.0000111256
+Маржа: X1
+Фиксации: 0.0000116546 (30%) 0.0000118681 (70%)
+Дата: 10.07.2025
+
+ENA (long)
+Чистое движение: 6.81%
+ENTRY: 0.2599
+Маржа: X1
+Фиксации: 0.2685 (30%) 0.2815 (70%)
+Дата: 08.07.2025
+
+POPCAT (long)
+Чистое движение: 0.00%
+ENTRY: 0.2864
+Маржа: X1
+Фиксации: 0.2864 (100%)
+Дата: 08.07.2025
+
+TIA (short)
+Чистое движение: 0.00%
+ENTRY: 1.5821
+Маржа: X1
+Фиксации: 1.5821 (100%)
+Дата: 07.07.2025
+
+AI16Z (short)
+Чистое движение: -0.85%
+ENTRY: 0.1493
+Маржа: X0.75
+Фиксации: 0.151 (100%)
+Дата: 07.07.2025
+
+JUP (short)
+Чистое движение: 0.00%
+ENTRY: 0.4394
+Маржа: X1
+Фиксации: 0.4394 (100%)
+Дата: 05.07.2025
+
+LDO (short)
+Чистое движение: 0.94%
+ENTRY: 0.7552
+Маржа: X1
+Фиксации: 0.7315 (30%) 0.7552 (70%)
+Дата: 04.07.2025
+
+LINK (short)
+Чистое движение: 0.00%
+ENTRY: 13.289
+Маржа: X1
+Фиксации: 13.289 (100%)
+Дата: 04.07.2025
+
+ORDI (short)
+Чистое движение: 5.92%
+ENTRY: 8.166
+Маржа: X1
+Фиксации: 7.906 (30%) 7.587 (70%)
+Дата: 03.07.2025
+
+UNI (short)
+Чистое движение: 6.90%
+ENTRY: 7.635
+Маржа: X1
+Фиксации: 7.372 (30%) 6.995 (70%)
+Дата: 03.07.2025
+
+WIF (short)
+Чистое движение: 0.98%
+ENTRY: 0.9167
+Маржа: X1
+Фиксации: 0.8867 (30%) 0.9167 (70%)
+Дата: 03.07.2025
+
+POPCAT (short)
+Чистое движение: 3.07%
+ENTRY: 0.2932
+Маржа: X1
+Фиксации: 0.2825 (30%) 0.2735 (20%) 0.2895 (50%)
+Дата: 01.07.2025
+
+UNI (short)
+Чистое движение: 0.95%
+ENTRY: 7.04
+Маржа: X1
+Фиксации: 6.706 (20%) 7.04 (80%)
+Дата: 01.07.2025
+
+TAO (short)
+Чистое движение: -1.56%
+ENTRY: 332.32
+Маржа: X0.5
+Фиксации: 342.7 (100%)
+Дата: 30.06.2025
+
+W (short)
+Чистое движение: -4.21%
+ENTRY: 0.0737
+Маржа: X1
+Фиксации: 0.0768 (100%)
+Дата: 28.06.2025
+
+W (short)
+Чистое движение: -4.03%
+ENTRY: 0.07595
+Маржа: X1.25
+Фиксации: 0.0784 (100%)
+Дата: 28.06.2025
+
+BIGTIME (short)
+Чистое движение: -3.37%
+ENTRY: 0.04949
+Маржа: X1
+Фиксации: 0.05116 (100%)
+Дата: 27.06.2025
+
+JUP (short)
+Чистое движение: 0.00%
+ENTRY: 0.403
+Маржа: X1
+Фиксации: 0.403 (100%)
+Дата: 26.06.2025
+
+ARB (short)
+Чистое движение: 0.00%
+ENTRY: 0.3151
+Маржа: X1
+Фиксации: 0.3151 (100%)
+Дата: 25.06.2025
+
+GPS (short)
+Чистое движение: 0.48%
+ENTRY: 0.0353
+Маржа: X0.5
+Фиксации: 0.0336 (20%) 0.0353 (70%)
+Дата: 25.06.2025
+
+GPS (short)
+Чистое движение: 4.49%
+ENTRY: 0.0342
+Маржа: X0.5
+Фиксации: 0.0319 (30%) 0.0308 (70%)
+Дата: 25.06.2025
+
+SUI (short)
+Чистое движение: 4.36%
+ENTRY: 2.7609
+Маржа: X1
+Фиксации: 2.6283 (30%) 2.6456 (70%)
+Дата: 24.06.2025
+
+PEPE (long)
+Чистое движение: 0.00%
+ENTRY: 0.0089358
+Маржа: X1
+Фиксации: 0.0089358 (100%)
+Дата: 23.06.2025
+
+SEI (long)
+Чистое движение: 0.00%
+ENTRY: 0.195
+Маржа: X0.5
+Фиксации: 0.195 (100%)
+Дата: 22.06.2025
+
+FARTCOIN (long)
+Чистое движение: 0.00%
+ENTRY: 0.8575
+Маржа: X1
+Фиксации: 0.8575 (100%)
+Дата: 22.06.2025
+
+FARTCOIN (long)
+Чистое движение: -1.48%
+ENTRY: 0.8598
+Маржа: X0.5
+Фиксации: 0.8344 (100%)
+Дата: 22.06.2025
+
+ONDO (short)
+Чистое движение: 3.78%
+ENTRY: 0.726
+Маржа: X1
+Фиксации: 0.7096 (20%) 0.6958 (80%)
+Дата: 21.06.2025
+
+POPCAT (long)
+Чистое движение: -4.16%
+ENTRY: 0.2983
+Маржа: X1
+Фиксации: 0.2859 (100%)
+Дата: 20.06.2025
+
+INJ (long)
 Чистое движение: 0.21%
 ENTRY: 11.345
 Маржа: X1
 Фиксации: 11.425 (30%) 11.345 (70%)
-18.06.25
-📅
+Дата: 18.06.2025
 
 LINK (short)
 Чистое движение: 1.18%
 ENTRY: 12.925
 Маржа: X1
 Фиксации: 12.772 (100%)
-18.06.25
-📅
+Дата: 18.06.2025
+
+ENS (long)
+Чистое движение: -4.22%
+ENTRY: 19.826
+Маржа: X1
+Фиксации: 18.989 (100%)
+Дата: 18.06.2025
 
 AVAX (short)
 Чистое движение: 0.00%
 ENTRY: 268.25
 Маржа: X1
 Фиксации: 268.25 (100%)
-17.06.25
-📅
+Дата: 17.06.2025
 
-ZKJ (Лонг)
+ZKJ (long)
 Чистое движение: -2.24%
 ENTRY: 0.4394
 Маржа: X0.25
 Фиксации: 0.4 (100%)
-Дата: 17.06.25
+Дата: 17.06.2025
 
-PNUT (Лонг)
+PNUT (long)
 Чистое движение: 0.00%
 ENTRY: 0.24207
 Маржа: X1
 Фиксации: 0.24207 (100%)
-Дата: 16.06.25
+Дата: 16.06.2025
 
-JTO (Шорт)
+JTO (short)
 Чистое движение: -3.35%
 ENTRY: 2.164
 Маржа: X1
 Фиксации: 2.2366 (100%)
-Дата: 15.06.25
+Дата: 15.06.2025
 
-AAVE (Лонг)
+AAVE (long)
 Чистое движение: -2.49%
 ENTRY: 276.61
 Маржа: X1
 Фиксации: 269.72 (100%)
-Дата: 15.06.25
+Дата: 15.06.2025
 
-LINK (Лонг)
+LINK (long)
 Чистое движение: -4.45%
 ENTRY: 13.544
 Маржа: X1
 Фиксации: 12.941 (100%)
-Дата: 13.06.25
+Дата: 13.06.2025
 
-UNI (Шорт)
+UNI (short)
 Чистое движение: 7.25%
 ENTRY: 7.926
 Маржа: X1
 Фиксации: 7.638 (30%) 7.229 (70%)
-Дата: 12.06.25
+Дата: 12.06.2025
 
-AVAAI (Лонг)
+AVAAI (long)
 Чистое движение: 1.16%
 ENTRY: 0.03954
 Маржа: X1
 Фиксации: 0.04107 (30%)
-Дата: 08.06.25
+Дата: 08.06.2025
 
-LINK (Лонг)
+LINK (long)
 Чистое движение: 6.43%
 ENTRY: 13.819
 Маржа: X1
 Фиксации: 14.446 (30%) 14.819 (70%)
-Дата: 08.06.25
+Дата: 08.06.2025
 
-WIF (Лонг)
+WIF (long)
 Чистое движение: -3.36%
 ENTRY: 0.8963
 Маржа: X1
 Фиксации: 0.8662 (100%)
-Дата: 07.06.25
+Дата: 07.06.2025
 
-FARTCOIN (Лонг)
+FARTCOIN (long)
 Чистое движение: 1.68%
 ENTRY: 0.9951
 Маржа: X1
 Фиксации: 1.0509 (30%)
-Дата: 07.06.25
+Дата: 07.06.2025
 
-POPCAT (Лонг)
+POPCAT (long)
 Чистое движение: 1.31%
 ENTRY: 0.3463
 Маржа: X1
 Фиксации: 0.3614 (30%)
-Дата: 07.06.25
+Дата: 07.06.2025
 
-FARTCOIN (Лонг)
+FARTCOIN (long)
 Чистое движение: -2.38%
 ENTRY: 1.0507
 Маржа: X0.5
 Фиксации: 1.0007 (100%)
-Дата: 06.06.25
+Дата: 06.06.2025
 
-LQTY (Шорт)
+LQTY (short)
 Чистое движение: 6.44%
 ENTRY: 0.09687
 Маржа: X1
 Фиксации: 0.09063 (100%)
-Дата: 05.06.25
+Дата: 05.06.2025
 
-APE (Шорт)
+APE (short)
 Чистое движение: 6.77%
 ENTRY: 0.7417
 Маржа: X1
 Фиксации: 0.7015 (50%) 0.6815 (50%)
-Дата: 04.06.25
+Дата: 04.06.2025
 
-ARC перезаход (Шорт)
+ARC (short)
 Чистое движение: 7.15%
 ENTRY: 0.04487
 Маржа: X1
 Фиксации: 0.04166 (100%)
-Дата: 04.06.25
+Дата: 04.06.2025
 
-ARC (Шорт)
+ARC (short)
 Чистое движение: 0.00%
 ENTRY: 0.04482
 Маржа: X1
 Фиксации: 0.04482 (100%)
-Дата: 04.06.25
+Дата: 04.06.2025
 
-FARTCOIN (Шорт)
+FARTCOIN (short)
 Чистое движение: -1.62%
 ENTRY: 1.085
 Маржа: X0.5
 Фиксации: 1.1201 (100%)
-Дата: 02.06.25
+Дата: 02.06.2025
 
-AVAX (Лонг)
+AVAX (long)
 Чистое движение: 0.00%
 ENTRY: 20.498
 Маржа: X1
 Фиксации: 20.498 (100%)
-Дата: 31.05.25
+Дата: 31.05.2025
 
-AAVE (Лонг)
+AAVE (long)
 Чистое движение: -3.35%
 ENTRY: 252.19
 Маржа: X1
 Фиксации: 243.74 (100%)
-Дата: 30.05.25
+Дата: 30.05.2025
 
-INJ (скальп) (Шорт)
+INJ (short)
 Чистое движение: 0.00%
 ENTRY: 13.112
 Маржа: X1
 Фиксации: 13.112 (100%)
-Дата: 30.06.25
+Дата: 30.05.2025
 
-Ondo (Шорт)
+ONDO (short)
 Чистое движение: 5.35%
 ENTRY: 0.9014
 Маржа: X1
 Фиксации: 0.8731 (50%) 0.8332 (50%)
-Дата: 30.05.25
+Дата: 30.05.2025
 
-INJ (Шорт)
+INJ (short)
 Чистое движение: 0.69%
 ENTRY: 14.124
 Маржа: X1
 Фиксации: 13.8 (30%)
-Дата: 30.05.25
+Дата: 30.05.2025
 
-WIF (Шорт)
+WIF (short)
 Чистое движение: 6.44%
 ENTRY: 1.0681
 Маржа: X1
 Фиксации: 0.9993 (100%)
-Дата: 29.06.25
+Дата: 29.05.2025
 
-FARTCOIN (Шорт)
+FARTCOIN (short)
 Чистое движение: 3.53%
 ENTRY: 1.2424
 Маржа: X0.5
 Фиксации: 1.1547 (100%)
-Дата: 29.06.25
+Дата: 29.05.2025
 
-PEPE (Шорт)
+PEPE (short)
 Чистое движение: 5.65%
 ENTRY: 0.0000140714
 Маржа: X1
 Фиксации: 0.0000136603 (30%) 0.0000131119 (70%)
-Дата: 29.06.25
+Дата: 29.05.2025
 
-AAVE (Шорт)
+AAVE (short)
 Чистое движение: -2.85%
 ENTRY: 261.31
 Маржа: X1
 Фиксации: 268.77 (100%)
-Дата: 28.06.25
+Дата: 28.05.2025
 
-SUI (Шорт)
+SUI (short)
 Чистое движение: -3.28%
 ENTRY: 3.5275
 Маржа: X1
 Фиксации: 3.6432 (100%)
-Дата: 28.05.25
+Дата: 28.05.2025
 
-TURBO (Лонг)
+TURBO (long)
 Чистое движение: 0.00%
 ENTRY: 0.005209
 Маржа: X1
 Фиксации: 0.005209 (100%)
-Дата: 28.05.25
+Дата: 28.05.2025
 
-LDO (Лонг)
+LDO (long)
 Чистое движение: 2.23%
 ENTRY: 0.9091
 Маржа: X1
 Фиксации: 0.9496 (50%)
-Дата: 27.05.25
+Дата: 27.05.2025
 
-ai16Z (Лонг)
+AI16Z (long)
 Чистое движение: 5.61%
 ENTRY: 0.3014
 Маржа: X1
 Фиксации: 0.3183 (100%)
-Дата: 27.05.25
+Дата: 27.05.2025
 
-RUNE (Лонг)
+RUNE (long)
 Чистое движение: -1.97%
 ENTRY: 1.98
 Маржа: X1
 Фиксации: 1.941 (100%)
-Дата: 26.05.25
+Дата: 26.05.2025
 
-FARTCOIN (Лонг)
+FARTCOIN (long)
 Чистое движение: -1.82%
 ENTRY: 1.514
 Маржа: X0.5
 Фиксации: 1.4588 (100%)
-Дата: 23.05.25
+Дата: 23.05.2025
 
-Ethfi (Лонг)
+ETHFI (long)
 Чистое движение: -4.04%
 ENTRY: 1.2933
 Маржа: X1
 Фиксации: 1.2411 (100%)
-Дата: 23.05.25
+Дата: 23.05.2025
 
-Fartcoin (Лонг)
+FARTCOIN (long)
 Чистое движение: 1.55%
 ENTRY: 1.5518
 Маржа: X1
 Фиксации: 1.6319 (30%)
-Дата: 23.05.25
+Дата: 23.05.2025
 
-Aixbt (Лонг)
+AIXBT (long)
 Чистое движение: 4.63%
 ENTRY: 0.18543
 Маржа: X1
 Фиксации: 0.1917 (30%) 0.195 (70%)
-Дата: 21.06.25
+Дата: 21.05.2025
 
-WCT (Лонг)
+WCT (long)
 Чистое движение: -2.58%
 ENTRY: 0.6911
 Маржа: X0.5
 Фиксации: 0.6554 (100%)
-Дата: 21.05.25
+Дата: 21.05.2025
 
-Griffain (Лонг)
+GRIFFAIN (long)
 Чистое движение: 4.47%
 ENTRY: 0.10263
 Маржа: X0.5
 Фиксации: 0.1118 (100%)
-Дата: 20.05.25
+Дата: 20.05.2025
 
-AAVE (Лонг)
+AAVE (long)
 Чистое движение: 7.10%
 ENTRY: 224.67
 Маржа: X1
 Фиксации: 233.17 (30%) 243.8 (70%)
-Дата: 19.05.25
+Дата: 19.05.2025
 
-LINK (Лонг)
+LINK (long)
 Чистое движение: 5.86%
 ENTRY: 15.287
 Маржа: X1
 Фиксации: 15.722 (30%) 16.38 (70%)
-Дата: 19.05.25
+Дата: 19.05.2025
 
-GRIFFAIN (Шорт)
+GRIFFAIN (short)
 Чистое движение: 1.34%
 ENTRY: 0.10511
 Маржа: X1
 Фиксации: 0.1004 (30%)
-Дата: 18.05.25
+Дата: 18.05.2025
 
-UNI (Лонг)
+UNI (long)
 Чистое движение: 1.79%
 ENTRY: 5.763
 Маржа: X0.5
 Фиксации: 5.969 (100%)
-Дата: 17.05.25
+Дата: 17.05.2025
 
-PEPE (Шорт)
+PEPE (short)
 Чистое движение: -2.29%
 ENTRY: 0.0000123186
 Маржа: X0.5
 Фиксации: 0.0000128829 (100%)
-Дата: 17.05.25
+Дата: 17.05.2025
 
-AVAX (Шорт)
+AVAX (short)
 Чистое движение: 0.00%
 ENTRY: 22.566
 Маржа: X1
 Фиксации: 22.566 (100%)
-Дата: 17.05.25
-`;
+Дата: 17.05.2025
+    </script>
+    <script>
+    function pageController(statsTextContent) {
+        let STATS_DATA = { summary: {}, trades: [] };
+        const PLOTLY_CONFIG = { displayModeBar: false, responsive: true };
+        const PLOTLY_LAYOUT_DARK = {
+            paper_bgcolor: 'rgba(0,0,0,0)',
+            plot_bgcolor: 'rgba(0,0,0,0)',
+            font: { color: '#e2e8f0', family: 'Inter, sans-serif' },
+            xaxis: { gridcolor: 'rgba(51, 65, 85, 0.3)', linecolor: '#334155', zeroline: false },
+            yaxis: { gridcolor: 'rgba(51, 65, 85, 0.3)', linecolor: '#334155', zeroline: false },
+            legend: { font: { color: '#e2e8f0' } }
+        };
 
-
-        function parseAllTradesFromProvidedText(text) {
-            const trades = [];
-            const blocks = text.split('\n\n').filter(block => block.trim().length > 0);
-
-            blocks.forEach(block => {
-                const lines = block.split('\n').map(line => line.trim()).filter(line => line.length > 0);
-                if (lines.length === 0) return;
-
-                let trade = { fixations: [] };
-                const firstLine = lines[0];
-
-                const coinDirectionMatch = firstLine.match(/^(.+?)\s*\((Лонг|Шорт|short|long)\)$/i);
-
-                if (coinDirectionMatch) {
-                    let coinNameFull = coinDirectionMatch[1].trim();
-                    let direction = coinDirectionMatch[2].trim().toLowerCase();
-
-                    if (coinNameFull.toLowerCase().includes('(скальп)')) {
-                        trade.type = 'скальп';
-                        coinNameFull = coinNameFull.replace(/\(скальп\)/i, '').trim();
-                    }
-
-                    trade.coin = coinNameFull.toUpperCase(); // Убеждаемся, что название монеты всегда в верхнем регистре
-                    trade.direction = (direction === 'лонг' || direction === 'long' ? 'long' : 'short');
-                } else {
-                    console.warn("Could not parse coin and direction from line:", firstLine);
-                    return;
+        function parseStatsData(textContent) {
+            const parts = textContent.split(/--- Статистика:.*?---/);
+            let summary = {}, trades = [];
+            if (parts.length > 1) {
+                const summaryMatch = parts[1].match(/Чистое движение: (.*?)\nВинрейт: (.*?)\nВсего сделок: (.*?)\nУспешных: (.*?)\nУбыточных: (.*?)\nВ безубыток: (.*?)\nВ отработке: (.*?)\n\n\nНачало - (.*?)\nПоследнее обновление - (.*?)\n/);
+                if (summaryMatch) {
+                    const keys = ["total_pnl", "winrate", "total_deals", "successful", "losing", "breakeven", "in_progress", "start_date", "last_update"];
+                    summary = Object.fromEntries(keys.map((key, i) => [key, summaryMatch[i + 1].trim()]));
                 }
-
-                let hasNetMovement = false;
-                let hasFixations = false;
-
-                lines.slice(1).forEach(line => {
-                    if (line.startsWith('Чистое движение:')) {
-                        trade.netMovement = parseFloat(line.replace('Чистое движение:', '').replace('%', '').trim());
-                        hasNetMovement = true;
-                    } else if (line.startsWith('ENTRY:')) {
-                        trade.entry = parseFloat(line.replace('ENTRY:', '').trim());
-                    } else if (line.startsWith('Маржа:')) {
-                        trade.margin = parseFloat(line.replace('Маржа:', '').replace('X', '').trim());
-                    } else if (line.startsWith('Фиксации:')) {
-                        const fixationsString = line.replace('Фиксации:', '').trim();
-                        const fixationMatches = fixationsString.matchAll(/(\d+\.?\d*)\s*\((\d+\.?\d*)\%\)/g);
-                        for (const match of fixationMatches) {
-                            const price = parseFloat(match[1]);
-                            const percent = parseFloat(match[2]);
-                            if (!isNaN(price) && !isNaN(percent)) {
-                                trade.fixations.push({ price, percent });
-                            }
+            }
+            if (parts.length > 2) {
+                parts[2].trim().split('\n\n').forEach(block => {
+                    if (!block.trim()) return;
+                    let trade = {};
+                    const lines = block.trim().split('\n');
+                    const titleMatch = lines[0].match(/(.+?)\s+\((long|short)\)/);
+                    if (!titleMatch) return;
+                    trade.ticker = titleMatch[1].trim();
+                    trade.type = titleMatch[2].trim();
+                    const keyMap = { 'чистое движение': 'pnl', 'entry': 'entry', 'маржа': 'margin', 'фиксации': 'exits', 'дата': 'date' };
+                    lines.slice(1).forEach(line => {
+                        const [key, ...valueParts] = line.split(':');
+                        if (valueParts.length > 0 && keyMap[key.trim().toLowerCase()]) {
+                            trade[keyMap[key.trim().toLowerCase()]] = valueParts.join(':').trim();
                         }
-                        if (trade.fixations.length === 0 && fixationsString.includes('100%') && !isNaN(trade.entry)) {
-                             trade.fixations.push({ price: trade.entry, percent: 100 });
-                        }
-                        hasFixations = true;
-                    } else if (line.startsWith('Дата:')) { // Обработка даты с префиксом "Дата:"
-                        const dateString = line.replace('Дата:', '').trim();
-                        if (dateString) {
-                            const parts = dateString.split('.');
-                            if (parts.length === 3) {
-                                const day = parts[0];
-                                const month = parts[1];
-                                const year = `20${parts[2]}`;
-                                trade.date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day)).toISOString();
-                            }
-                        }
-                    } else if (line.match(/^(\d{2})\.(\d{2})\.(\d{2})$/)) { // Обработка даты без префикса (DD.MM.YY)
-                        const dateMatch = line.match(/^(\d{2})\.(\d{2})\.(\d{2})$/);
-                        if (dateMatch) {
-                            const day = dateMatch[1];
-                            const month = dateMatch[2];
-                            const year = `20${dateMatch[3]}`;
-                            trade.date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day)).toISOString();
-                        }
-                    }
-                    // Игнорируем строки, содержащие только эмодзи календаря
-                    if (line === '📅') {
-                        // Просто пропускаем
-                    }
+                    });
+                    if (trade.pnl) trade.pnl_value = parseFloat(trade.pnl.replace('%', '').replace(',', '.'));
+                    trades.push(trade);
                 });
-
-                trade.id = `trade-${crypto.randomUUID()}`;
-                
-                // Если нет чистого движения ИЛИ фиксаций, помечаем как "в отработке"
-                if (!hasNetMovement || !hasFixations) {
-                    trade.isInProgress = true;
-                    trade.netMovement = 0; // Устанавливаем 0, чтобы не влияло на общие результаты
-                    trade.isProfitable = false; // Не считается прибыльной/убыточной для винрейта
-                } else {
-                    trade.isInProgress = false;
-                    const metrics = calculateTradeMetrics(trade);
-                    trade.netMovement = metrics.netMovement;
-                    trade.isProfitable = metrics.isProfitable;
-                }
-
-                trades.push(trade);
-            });
-            return trades;
+            }
+            return { summary, trades };
         }
 
-        function calculateTradeMetrics(trade) {
-            let totalContribution = 0;
-
-            if (trade.fixations && trade.fixations.length > 0) {
-                trade.fixations.forEach(fix => {
-                    const price = parseFloat(fix.price);
-                    const percent = parseFloat(fix.percent);
-
-                    if (isNaN(price) || isNaN(percent) || percent === 0) {
-                        return;
-                    }
-
-                    const entry = parseFloat(trade.entry);
-                    const direction = trade.direction;
-
-                    let movementDecimal;
-                    if (direction === 'long') {
-                        movementDecimal = (price - entry) / entry;
-                    } else {
-                        movementDecimal = (entry - price) / entry;
-                    }
-                    totalContribution += movementDecimal * (percent / 100);
-                });
-            } else {
-                totalContribution = 0;
+        function calculateSimulation(trades, simType, initialBalance, riskPercent, leverage) {
+            let currentBalance = initialBalance;
+            const balanceHistory = [0.0];
+            const chronoTrades = [...trades].reverse();
+            for (const trade of chronoTrades) {
+                const pnlPercent = trade.pnl_value || 0.0;
+                const tradeCapital = simType === 'compound' ? currentBalance * (riskPercent / 100.0) : initialBalance * (riskPercent / 100.0);
+                const positionSize = tradeCapital * leverage;
+                const profitOrLoss = positionSize * (pnlPercent / 100.0);
+                currentBalance += profitOrLoss;
+                const growthPercent = initialBalance > 0 ? (currentBalance / initialBalance - 1) * 100 : 0;
+                balanceHistory.push(growthPercent);
             }
-
-            const netMovementPercentage = totalContribution * 100 * parseFloat(trade.margin || 1);
-            const isProfitable = netMovementPercentage > 0;
-
-            return { netMovement: netMovementPercentage, isProfitable: isProfitable };
-        }
-
-        function calculateStatisticMetrics(statisticId) {
-            const stat = statistics[statisticId];
-            if (!stat || !stat.trades || stat.trades.length === 0) {
-                return {
-                    totalTrades: 0,
-                    profitableTrades: 0,
-                    rejectedTrades: 0,
-                    breakevenTrades: 0,
-                    inProgressTrades: 0, // Новое поле
-                    winRate: 0,
-                    totalNetMovement: 0
-                };
-            }
-
-            let profitableTrades = 0;
-            let rejectedTrades = 0;
-            let breakevenTrades = 0;
-            let inProgressTrades = 0; // Новый счетчик
-            let totalNetMovement = 0;
-
-            stat.trades.forEach(trade => {
-                if (trade.isInProgress) {
-                    inProgressTrades++;
-                } else { // Учитываем только завершенные сделки для этих категорий
-                    const metrics = calculateTradeMetrics(trade);
-                    trade.netMovement = metrics.netMovement;
-                    trade.isProfitable = metrics.isProfitable;
-
-                    if (trade.netMovement > 0) {
-                        profitableTrades++;
-                    } else if (trade.netMovement < 0) {
-                        rejectedTrades++;
-                    } else { // Net movement is 0
-                        breakevenTrades++;
-                    }
-                    totalNetMovement += trade.netMovement;
-                }
-            });
-
-            const completedTradesCount = profitableTrades + rejectedTrades + breakevenTrades;
-            const winRate = (completedTradesCount > 0) ? (profitableTrades / completedTradesCount) * 100 : 0;
-
             return {
-                totalTrades: stat.trades.length, // Общее количество всех сделок (включая в отработке)
-                profitableTrades: profitableTrades,
-                rejectedTrades: rejectedTrades,
-                breakevenTrades: breakevenTrades,
-                inProgressTrades: inProgressTrades, // Количество сделок в отработке
-                winRate: winRate,
-                totalNetMovement: totalNetMovement
+                final_percent: balanceHistory[balanceHistory.length - 1],
+                final_balance: currentBalance,
+                history: balanceHistory
             };
         }
 
-        function renderTradeDetail(statisticId) {
-            const stat = statistics[statisticId];
+        function renderSummary(summary) {
+            document.getElementById('summary-total_pnl').textContent = summary.total_pnl || 'N/A';
+            document.getElementById('summary-winrate').textContent = summary.winrate || 'N/A';
+            document.getElementById('summary-total_deals').textContent = summary.total_deals || 'N/A';
+            document.getElementById('last-update').textContent = `Последнее обновление: ${summary.last_update || 'N/A'}`;
+        }
 
-            const tradeListContainer = document.getElementById('trade-list');
-            tradeListContainer.innerHTML = '';
+        function plotSummaryChart(summary) {
+            const data = [{
+                values: [ parseInt(summary.successful || 0), parseInt(summary.losing || 0), parseInt(summary.breakeven || 0) ],
+                labels: ['Успешных', 'Убыточных', 'В безубыток'],
+                hole: .7, type: 'pie',
+                marker: { colors: ['#10b981', '#f43f5e', '#64748b'], line: { color: '#0f172a', width: 2 } },
+                textinfo: 'none', 
+                hovertemplate: '<b>%{label}</b><br>%{value} сделок<extra></extra>'
+            }];
+            const layout = { ...PLOTLY_LAYOUT_DARK, showlegend: false, margin: { t: 0, b: 0, l: 0, r: 0 } };
+            Plotly.newPlot('summary-chart', data, layout, PLOTLY_CONFIG);
+        }
 
-            if (!stat.trades || stat.trades.length === 0) {
-                document.getElementById('no-trades-message').classList.remove('hidden');
-                tradeListContainer.classList.add('hidden');
-                return;
-            } else {
-                document.getElementById('no-trades-message').classList.add('hidden');
-                tradeListContainer.classList.remove('hidden');
-            }
+        function plotPnlChart(trades) {
+            const chronoTrades = [...trades].reverse();
+            let cumulativePnl = 0;
+            const pnlHistory = chronoTrades.map(trade => cumulativePnl += trade.pnl_value || 0);
+            const hoverTexts = chronoTrades.map(row => `<b>${row.ticker} (${row.type})</b><br>Дата: ${row.date}<br>PnL: ${(row.pnl_value || 0).toFixed(2)}%`);
+            const data = [{
+                x: Array.from({length: pnlHistory.length}, (_, i) => i + 1),
+                y: pnlHistory,
+                mode: 'lines', type: 'scatter',
+                line: { color: '#22d3ee', width: 3, shape: 'spline' },
+                fill: 'tozeroy',
+                fillcolor: 'rgba(14, 165, 233, 0.1)',
+                customdata: hoverTexts,
+                hovertemplate: "%{customdata}<br><b>Итог: %{y:.2f}%</b><extra></extra>"
+            }];
+            const layout = { ...PLOTLY_LAYOUT_DARK, xaxis: { ...PLOTLY_LAYOUT_DARK.xaxis, title: 'Номер сделки' }, yaxis: { ...PLOTLY_LAYOUT_DARK.yaxis, title: 'Кумулятивный PnL (%)' }, margin: { t: 20, b: 40, l: 60, r: 20 },
+                hoverlabel: { bgcolor: "#0f172a", bordercolor: "#22d3ee", font: {color: "#e2e8f0", family: 'Inter, sans-serif'} }
+            };
+            Plotly.newPlot('pnl-chart', data, layout, PLOTLY_CONFIG);
+        }
 
-            stat.trades.forEach((trade, index) => {
-                let profitLossClass = '';
-                let netMovementDisplay = '';
-                let fixationsDisplay = '';
-                let tradeCardClasses = "trade-card bg-white p-6 rounded-xl shadow-md cursor-default";
+        function renderTradesTable(trades) {
+            const container = document.getElementById('trades-list-container');
+            container.innerHTML = '';
+            
+            const table = document.createElement('table');
+            table.className = 'w-full text-left hidden lg:table';
+            table.innerHTML = `
+                <thead class="bg-slate-900/50 text-slate-400 uppercase text-xs sticky top-0 backdrop-blur-sm">
+                    <tr>
+                        <th class="p-3">Дата</th><th class="p-3">Тикер</th><th class="p-3">Тип</th>
+                        <th class="p-3">PnL</th><th class="p-3">Entry</th><th class="p-3">Маржа</th>
+                    </tr>
+                </thead>
+                <tbody class="text-sm"></tbody>
+            `;
+            const tbody = table.querySelector('tbody');
 
-                if (trade.isInProgress) {
-                    netMovementDisplay = '<span class="in-progress-text">В отработке</span>';
-                    fixationsDisplay = '<span class="in-progress-text">В отработке</span>';
-                    profitLossClass = 'profit-loss-gray'; // Используем обычный серый фон для "в отработке"
-                    tradeCardClasses += " opacity-70"; // Делаем карточку слегка прозрачной
-                } else {
-                    if (trade.netMovement > 0) {
-                        profitLossClass = 'profit-loss-green';
-                    } else if (trade.netMovement < 0) {
-                        profitLossClass = 'profit-loss-red';
-                    } else {
-                        profitLossClass = 'profit-loss-gray';
-                    }
-                    netMovementDisplay = `Чистое движение: ${isNaN(trade.netMovement) ? 'N/A' : trade.netMovement.toFixed(2)}%`;
-                    fixationsDisplay = trade.fixations.map(fix => {
-                        const price = parseFloat(fix.price);
-                        const percent = parseFloat(fix.percent);
-                        return `${isNaN(price) ? 'N/A' : price} (${isNaN(percent) ? 'N/A' : percent}%)`;
-                    }).join(' ');
-                }
+            const mobileList = document.createElement('div');
+            mobileList.className = 'space-y-3 lg:hidden';
 
-                let displayDate = 'Дата не добавлена';
-                if (trade.date) {
-                    const tradeDate = new Date(trade.date);
-                    if (!isNaN(tradeDate.getTime())) {
-                        displayDate = tradeDate.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: '2-digit' });
-                    }
-                }
+            trades.forEach(trade => {
+                const pnlValue = trade.pnl_value || 0;
+                const pnlColor = pnlValue > 0 ? 'text-green-400' : pnlValue < 0 ? 'text-red-400' : 'text-slate-400';
+                const typePill = trade.type === 'long' 
+                    ? `<span class="inline-flex items-center gap-1.5 py-1 px-2 rounded-full text-xs font-medium bg-green-500/10 text-green-400"><svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7m0 0l7 7m-7-7v18" /></svg>Long</span>`
+                    : `<span class="inline-flex items-center gap-1.5 py-1 px-2 rounded-full text-xs font-medium bg-red-500/10 text-red-400"><svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3" /></svg>Short</span>`;
+                
+                const tableRow = document.createElement('tr');
+                tableRow.className = 'border-b border-slate-800 hover:bg-slate-700/50 transition-colors';
+                tableRow.innerHTML = `
+                    <td class="p-3 whitespace-nowrap text-slate-400">${trade.date || 'N/A'}</td>
+                    <td class="p-3 font-semibold whitespace-nowrap">${trade.ticker || 'N/A'}</td>
+                    <td class="p-3">${typePill}</td>
+                    <td class="p-3 font-mono ${pnlColor}">${trade.pnl || 'N/A'}</td>
+                    <td class="p-3 font-mono text-slate-400">${trade.entry || 'N/A'}</td>
+                    <td class="p-3 font-mono text-slate-400">${trade.margin || 'N/A'}</td>
+                `;
+                tbody.appendChild(tableRow);
 
-                const directionText = trade.direction === 'long' ? '<span class="color-green">long</span>' : '<span class="color-red">short</span>';
-
-                const tradeCardHtml = `
-                    <div class="${tradeCardClasses}" data-trade-id="${trade.id}" data-vlasov-readonly="true" style="animation-delay: ${index * 0.05}s;">
-                        <div class="flex justify-between items-center mb-2">
-                            <h4 class="text-lg font-semibold text-gray-800">${trade.coin} (${directionText})</h4>
-                            <span class="px-3 py-1 rounded-full text-sm font-bold ${profitLossClass}">
-                                ${netMovementDisplay}
-                            </span>
-                        </div>
-                        <p class="text-sm text-gray-600 mb-2">ENTRY: ${isNaN(trade.entry) ? 'N/A' : trade.entry}</p>
-                        <p class="text-sm text-gray-600 mb-2">Маржа: X${isNaN(trade.margin) ? 'N/A' : trade.margin}</p>
-                        <p class="text-sm text-gray-600 mb-2">Фиксации: ${fixationsDisplay}</p>
-                        <div class="trade-date-display-wrapper">
-                            <div class="date-wrapper disabled-date-interaction">
-                                <span class="trade-date-display-text">${displayDate}</span>
-                                <span class="calendar-icon">📅</span>
-                            </div>
-                        </div>
+                const mobileBlock = document.createElement('div');
+                mobileBlock.className = 'p-3 rounded-lg bg-slate-800/50 border border-slate-700';
+                mobileBlock.innerHTML = `
+                    <div class="flex justify-between items-center mb-2">
+                        <span class="font-semibold">${trade.ticker || 'N/A'}</span>
+                        ${typePill}
+                        <span class="font-mono ${pnlColor}">${trade.pnl || 'N/A'}</span>
+                    </div>
+                    <div class="flex justify-between items-center text-xs text-slate-400">
+                        <span>${trade.date || 'N/A'}</span>
+                        <span>Entry: <span class="font-mono">${trade.entry || 'N/A'}</span></span>
+                        <span>Маржа: <span class="font-mono">${trade.margin || 'N/A'}</span></span>
                     </div>
                 `;
-                tradeListContainer.insertAdjacentHTML('beforeend', tradeCardHtml);
+                mobileList.appendChild(mobileBlock);
+            });
+            
+            container.appendChild(table);
+            container.appendChild(mobileList);
+        }
+
+        function animateValue(obj, start, end, duration, isMoney = false, isPercent = false) {
+            let startTimestamp = null;
+            const step = (timestamp) => {
+                if (!startTimestamp) startTimestamp = timestamp;
+                const progress = Math.min((timestamp - startTimestamp) / duration, 1);
+                const currentVal = progress * (end - start) + start;
+                if (isPercent) obj.innerHTML = `${currentVal.toFixed(2)}%`;
+                else if (isMoney) obj.innerHTML = `$${currentVal.toLocaleString('en-US', { maximumFractionDigits: 0 })}`;
+                else obj.innerHTML = currentVal.toFixed(2);
+                if (progress < 1) window.requestAnimationFrame(step);
+            };
+            window.requestAnimationFrame(step);
+        }
+
+        function renderSimulationResults(results, initialBalance) {
+            const resultsSection = document.getElementById('simulation-section');
+            const resultsDiv = document.getElementById('simulation-results');
+            const finalLabel = results.final_percent >= 0 ? "Итоговая прибыль" : "Итоговый убыток";
+            const xDepo = initialBalance > 0 ? results.final_balance / initialBalance : 0;
+            resultsSection.classList.remove('hidden');
+            resultsDiv.innerHTML = `
+                <div class="text-center md:text-left">
+                    <p class="text-sm text-slate-400">${finalLabel}</p>
+                    <p id="sim-final-percent" class="text-4xl font-extrabold ${results.final_percent >= 0 ? 'text-green-400' : 'text-red-400'} my-1">0.00%</p>
+                    <p id="sim-final-balance" class="text-lg font-bold text-white">$0</p>
+                    <p class="text-sm text-slate-400">Множитель: <span id="sim-x-depo">0.00</span>x</p>
+                </div>`;
+            
+            const simChartData = [{
+                x: Array.from({length: results.history.length}, (_, i) => i),
+                y: results.history,
+                mode: 'lines', type: 'scatter',
+                line: { color: results.final_percent >= 0 ? '#10b981' : '#f43f5e', width: 2.5, shape: 'spline' },
+                fill: 'tozeroy',
+                fillcolor: results.final_percent >= 0 ? 'rgba(16, 185, 129, 0.2)' : 'rgba(244, 63, 94, 0.2)',
+                hovertemplate: 'Сделка №%{x}<br><b>Прибыль: %{y:.2f}%</b><extra></extra>'
+            }];
+            const simChartLayout = { ...PLOTLY_LAYOUT_DARK, yaxis: { autorange: true }, xaxis: { ...PLOTLY_LAYOUT_DARK.xaxis }, margin: { t: 20, b: 20, l: 40, r: 20 } };
+            Plotly.newPlot('simulation-chart', simChartData, simChartLayout, PLOTLY_CONFIG);
+
+            animateValue(document.getElementById('sim-final-percent'), 0, results.final_percent, 1500, false, true);
+            animateValue(document.getElementById('sim-final-balance'), initialBalance, results.final_balance, 1500, true);
+            animateValue(document.getElementById('sim-x-depo'), 0, xDepo, 1500);
+        }
+
+        function initPage() {
+            STATS_DATA = parseStatsData(statsTextContent);
+            renderSummary(STATS_DATA.summary);
+            plotSummaryChart(STATS_DATA.summary);
+            plotPnlChart(STATS_DATA.trades);
+            renderTradesTable(STATS_DATA.trades);
+            document.getElementById('custom-sim-form').addEventListener('submit', (e) => {
+                e.preventDefault();
+                const simType = e.submitter.dataset.simType;
+                const balance = parseFloat(document.getElementById('balance').value) || 1000;
+                const risk = parseFloat(document.getElementById('risk').value) || 3;
+                const leverage = parseFloat(document.getElementById('leverage').value) || 35;
+                const results = calculateSimulation(STATS_DATA.trades, simType, balance, risk, leverage);
+                renderSimulationResults(results, balance);
+            });
+            document.getElementById('balance').addEventListener('input', (e) => {
+                if (e.target.value === '09210921') {
+                    setTimeout(() => {
+                        openModal(document.getElementById('upload-modal'));
+                        e.target.value = '1000';
+                    }, 200);
+                }
             });
         }
+        initPage();
+    }
 
-        function openModal(modalId) {
-            document.getElementById(modalId).classList.add('active');
-        }
+    document.addEventListener('DOMContentLoaded', () => {
+        const initialStatsText = document.getElementById('stats-data-template').textContent;
+        pageController(initialStatsText);
 
-        function closeModal(modalId) {
-            document.getElementById(modalId).classList.remove('active');
-            if (modalId === 'results-modal') {
-                document.getElementById('results-additional-info').classList.add('hidden');
-                document.getElementById('results-details-btn').classList.remove('hidden');
+        const canvas = document.getElementById('background-canvas');
+        if (canvas) {
+            const ctx = canvas.getContext('2d');
+            let particlesArray;
+            
+            function resizeCanvas() {
+                canvas.width = window.innerWidth;
+                canvas.height = window.innerHeight;
             }
-        }
+            resizeCanvas();
 
-        function showResults(statisticId) {
-            const metrics = calculateStatisticMetrics(statisticId);
-            document.getElementById('results-net-movement').textContent = `${isNaN(metrics.totalNetMovement) ? 'N/A' : metrics.totalNetMovement.toFixed(2)}%`;
-            document.getElementById('results-net-movement').className = `font-bold ${metrics.totalNetMovement > 0 ? 'color-green' : (metrics.totalNetMovement < 0 ? 'color-red' : 'color-gray')}`;
-
-            document.getElementById('results-total-trades').textContent = metrics.totalTrades;
-            document.getElementById('results-winrate').textContent = `${isNaN(metrics.winRate) ? 'N/A' : metrics.winRate.toFixed(2)}%`;
-            document.getElementById('results-winrate').className = `font-bold ${metrics.winRate > 50 ? 'color-green' : (metrics.winRate < 50 ? 'color-red' : 'color-gray')}`;
-
-            document.getElementById('results-successful-trades').textContent = metrics.profitableTrades;
-            document.getElementById('results-rejected-trades').textContent = metrics.rejectedTrades;
-            document.getElementById('results-breakeven-trades').textContent = metrics.breakevenTrades;
-            document.getElementById('results-in-progress-trades').textContent = metrics.inProgressTrades; // Обновление нового поля
-
-            openModal('results-modal');
-        }
-
-        function generateSingleStatisticExportText(statisticId) {
-            let exportContent = '';
-            const stat = statistics[statisticId];
-
-            if (!stat || stat.trades.length === 0) {
-                return `Статистика "${stat ? stat.name : 'Неизвестная статистика'}" не содержит сделок для экспорта.`;
+            class Particle {
+                constructor(x, y, directionX, directionY, size, color) {
+                    this.x = x; this.y = y; this.directionX = directionX;
+                    this.directionY = directionY; this.size = size; this.color = color;
+                }
+                draw() {
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2, false);
+                    ctx.fillStyle = this.color;
+                    ctx.fill();
+                }
+                update() {
+                    if (this.x > canvas.width + this.size || this.x < -this.size) this.directionX = -this.directionX;
+                    if (this.y > canvas.height + this.size || this.y < -this.size) this.directionY = -this.directionY;
+                    this.x += this.directionX;
+                    this.y += this.directionY;
+                    this.draw();
+                }
             }
 
-            exportContent += `--- Статистика: ${stat.name} ---\n\n`;
-            const tradesToExport = [...stat.trades];
+            function initParticles() {
+                particlesArray = [];
+                let numberOfParticles = (canvas.height * canvas.width) / 15000;
+                const colors = ['rgba(16, 185, 129, 0.3)', 'rgba(14, 165, 233, 0.3)'];
+                for (let i = 0; i < numberOfParticles; i++) {
+                    let size = (Math.random() * 5) + 1;
+                    let x = Math.random() * canvas.width;
+                    let y = Math.random() * canvas.height;
+                    let directionX = (Math.random() * .4) - .2;
+                    let directionY = (Math.random() * .4) - .2;
+                    let color = colors[Math.floor(Math.random() * colors.length)];
+                    particlesArray.push(new Particle(x, y, directionX, directionY, size, color));
+                }
+            }
 
-            tradesToExport.forEach(trade => {
-                const directionText = trade.direction === 'long' ? 'long' : 'short';
-                const fixationsString = trade.fixations.map(f => `${parseFloat(f.price)} (${parseFloat(f.percent)}%)`).join(' ');
-
-                let tradeDateString = 'Дата не добавлена';
-                if (trade.date) {
-                    const tradeDate = new Date(trade.date);
-                    if (!isNaN(tradeDate.getTime())) {
-                        tradeDateString = tradeDate.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: '2-digit' });
+            function connectParticles() {
+                let opacityValue = 1;
+                for (let a = 0; a < particlesArray.length; a++) {
+                    for (let b = a; b < particlesArray.length; b++) {
+                        let distance = ((particlesArray[a].x - particlesArray[b].x) ** 2) + ((particlesArray[a].y - particlesArray[b].y) ** 2);
+                        if (distance < (canvas.width/10) * (canvas.height/10)) {
+                            opacityValue = 1 - (distance/20000);
+                            ctx.strokeStyle = `rgba(55, 65, 81, ${opacityValue})`;
+                            ctx.lineWidth = 1;
+                            ctx.beginPath();
+                            ctx.moveTo(particlesArray[a].x, particlesArray[a].y);
+                            ctx.lineTo(particlesArray[b].x, particlesArray[b].y);
+                            ctx.stroke();
+                        }
                     }
                 }
-                
-                // If in progress, do not export netMovement and fixations as actual values
-                if (trade.isInProgress) {
-                    exportContent += `${trade.coin} (${directionText})\n`;
-                    exportContent += `ENTRY: ${isNaN(trade.entry) ? 'N/A' : trade.entry}\n`;
-                    exportContent += `Маржа: X${isNaN(trade.margin) ? 'N/A' : trade.margin}\n`;
-                    exportContent += `Дата: ${tradeDateString}\n\n`;
-                } else {
-                    exportContent += `${trade.coin} (${directionText})\n`;
-                    exportContent += `Чистое движение: ${isNaN(trade.netMovement) ? 'N/A' : trade.netMovement.toFixed(2)}%\n`;
-                    exportContent += `ENTRY: ${isNaN(trade.entry) ? 'N/A' : trade.entry}\n`;
-                    exportContent += `Маржа: X${isNaN(trade.margin) ? 'N/A' : trade.margin}\n`;
-                    exportContent += `Фиксации: ${fixationsString}\n`;
-                    exportContent += `Дата: ${tradeDateString}\n\n`;
-                }
-            });
-            return exportContent.trim();
-        }
-
-        function copyToClipboard(text) {
-            const textarea = document.createElement('textarea');
-            textarea.value = text;
-            document.body.appendChild(textarea);
-            textarea.select();
-            try {
-                document.execCommand('copy');
-                console.log('Текст скопирован в буфер обмена!');
-            } catch (err) {
-                console.error('Не удалось скопировать текст:', err);
             }
-            document.body.removeChild(textarea);
-        }
 
-        function initializeVlasovStatistic() {
-            const vlasovId = `stat-${crypto.randomUUID()}`;
-            statistics[vlasovId] = {
-                name: VLADOV_STATISTIC_NAME,
-                trades: parseAllTradesFromProvidedText(ALL_USER_PROVIDED_TRADES_TEXT)
-            };
-            currentStatisticId = vlasovId;
-        }
-
-        document.addEventListener('DOMContentLoaded', () => {
-            initializeVlasovStatistic();
-            renderTradeDetail(currentStatisticId);
-
-            document.getElementById('show-results-btn').onclick = () => {
-                showResults(currentStatisticId);
-            };
-            document.getElementById('close-results-modal-btn').addEventListener('click', () => closeModal('results-modal'));
-
-            document.getElementById('results-details-btn').addEventListener('click', () => {
-                const additionalInfo = document.getElementById('results-additional-info');
-                const detailsBtn = document.getElementById('results-details-btn');
-                if (additionalInfo.classList.contains('hidden')) {
-                    additionalInfo.classList.remove('hidden');
-                    detailsBtn.classList.add('hidden');
-                } else {
-                    additionalInfo.classList.add('hidden');
-                    detailsBtn.classList.remove('hidden');
+            function animateParticles() {
+                requestAnimationFrame(animateParticles);
+                ctx.clearRect(0, 0, innerWidth, innerHeight);
+                for (let i = 0; i < particlesArray.length; i++) {
+                    particlesArray[i].update();
                 }
+                connectParticles();
+            }
+            
+            initParticles();
+            animateParticles();
+            window.addEventListener('resize', () => {
+                resizeCanvas();
+                initParticles();
+            });
+        }
+
+        const backdrop = document.getElementById('modal-backdrop');
+        const uploadModal = document.getElementById('upload-modal');
+        const codeModal = document.getElementById('code-modal');
+        const fileInput = document.getElementById('file-input');
+        const codeOutput = document.getElementById('code-output');
+        const copyCodeBtn = document.getElementById('copy-code-btn');
+
+        window.openModal = (modal) => {
+            backdrop.classList.add('active');
+            modal.classList.remove('hidden');
+            setTimeout(() => modal.classList.add('active'), 10);
+        }
+        window.closeAllModals = () => {
+            backdrop.classList.remove('active');
+            [uploadModal, codeModal].forEach(modal => {
+                modal.classList.remove('active');
+                setTimeout(() => modal.classList.add('hidden'), 300);
+            });
+        }
+        backdrop.addEventListener('click', closeAllModals);
+        document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeAllModals(); });
+
+        fileInput.addEventListener('change', (event) => {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const newContent = e.target.result;
+                    pageController(newContent);
+                    const currentHtml = document.documentElement.outerHTML;
+                    const oldStatsText = document.getElementById('stats-data-template').textContent;
+                    const newHtml = currentHtml.replace(oldStatsText, newContent);
+                    codeOutput.value = newHtml;
+                    closeAllModals();
+                    setTimeout(() => openModal(codeModal), 350);
+                };
+                reader.readAsText(file);
+            }
+        });
+
+        copyCodeBtn.addEventListener('click', () => {
+            codeOutput.select();
+            document.execCommand('copy');
+            copyCodeBtn.textContent = 'Скопировано!';
+            setTimeout(() => { copyCodeBtn.textContent = 'Скопировать код'; }, 2000);
+        });
+
+        document.querySelectorAll('.card').forEach(card => {
+            card.addEventListener('mousemove', e => {
+                const rect = card.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                const rotateX = (y / rect.height - 0.5) * -10;
+                const rotateY = (x / rect.width - 0.5) * 10;
+                card.style.transform = `rotateX(${rotateX}deg) rotateY(${rotateY}deg)`;
+            });
+            card.addEventListener('mouseleave', () => {
+                card.style.transform = 'rotateX(0deg) rotateY(0deg)';
             });
         });
+        
+        const auroraBg = document.getElementById('aurora-background');
+        if (auroraBg) {
+            window.addEventListener('mousemove', e => {
+                auroraBg.style.setProperty('--mouse-x', `${e.clientX}px`);
+                auroraBg.style.setProperty('--mouse-y', `${e.clientY}px`);
+            });
+        }
+    });
     </script>
 </body>
 </html>
